@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         VaakirHackpack V 5.0
+// @name         Gats.io - Vaakir's hack pack GUI V4
 // @namespace    http://tampermonkey.net/
-// @version      6
-// @description  try to take over the world!
-// @author       You
+// @version      4.2
+// @description  The almighty one
+// @author       PureVaakir (85%) & Freehuntx (15%)
 // @match        https://gats.io/
 // @grant        none
 // ==/UserScript==
@@ -16,7 +16,6 @@ class GUI {
     init() {
         this.gui = GUI.createCustomElement('div', this.parent, '', '', '', 'myFUNNYGUY');
         this.guiHead = GUI.createCustomElement('div', this.gui, 'Vaakir Hack pack V4.0', '', 'headDiv', '');
-            
 
         // Drag functionality on (gui head div)
         let offsetX, offsetY, isDragging = false, gui = this.gui;
@@ -218,7 +217,7 @@ class Folder {
         let _this = this;
         let container   = GUI.createCustomElement('div', this.parent, '', '', '', 'myBox');
         let button      = GUI.createCustomElement('div', container, this.name, '', this.id, this.className);
-        let subOptions  = GUI.createCustomElement('div', container, '', '', '', 'subOptionOpen');
+        let subOptions  = GUI.createCustomElement('div', container, '', '', '', 'subOptionClosed');
         this.subOptions = subOptions;
 
         button.onclick = function() {
@@ -308,25 +307,44 @@ class Folder {
 
         } else if (type == "input") {
             input = GUI.createCustomElement('input', row, val, type, '', 'inputText');
-            let buttonAdd = GUI.createCustomElement('button', row, '+', '', '', 'button');
-            let buttonRemove = GUI.createCustomElement('button', row, '-', '', '', 'button');
+            // let buttonAdd = GUI.createCustomElement('button', row, '+', '', '', 'button');
+            // let buttonRemove = GUI.createCustomElement('button', row, '-', '', '', 'button');
 
-            // input.onfocus = function() {
-            //     if (typeof j46 !== 'undefined') {
-            //         j46 = true; // disables movement in the game until other game input is recieved
-            //     }
-            // }
-            // input.onblur = function() {
-            //     if (typeof j46 !== 'undefined') {
-            //         j46 = false; // disables movement in the game until other game input is recieved
-            //     }
-            // }
-            buttonAdd.onclick = function() {
-                options.alliesList.push(input.value);
+            input.onfocus = function() {
+                if (typeof j46 !== 'undefined') {
+                    j46 = true; // disables movement in the game until other game input is recieved
+                }
             }
-            buttonRemove.onclick = function() {
-                options.alliesList = options.alliesList.filter(item => item !== input.value);
+            input.onblur = function() {
+                if (typeof j46 !== 'undefined') {
+                    j46 = false; // disables movement in the game until other game input is recieved
+                }
             }
+
+            const updateCheckboxState = () => { input.value = options[name]; };
+            const updateOptionsState = () => { options[name] = input.value; };
+            updateCheckboxState();
+
+            input.addEventListener('change', () => { updateOptionsState(); opts.saveOptions();});
+            options[name] = input.value;
+
+            // Watch for changes in the options object and update the checkbox accordingly
+            
+            Object.defineProperty(options, name, {
+                set(value) {
+                    input.value = value;
+                },
+                get() {
+                    return input.value;
+                },
+            });
+
+            // buttonAdd.onclick = function() {
+            //     options.alliesList.push(input.value);
+            // }
+            // buttonRemove.onclick = function() {
+            //     options.alliesList = options.alliesList.filter(item => item !== input.value);
+            // }
         }
     }
 }
@@ -336,12 +354,20 @@ const options = new class OptionsMenu {
         active: false,
         alwaysAim: false,
         calibrate: 30,
-        sortFrequency: 10,
+        moveFrequency: 10,
         autoShoot: true,
         espLine: true,
         espCollisions: true,
         allies: "",
         alliesList: ["[1337] PureVaakir","PureVaakir","Hacker0","VaakTradeBot"]
+    }
+    pathFinding = {
+        active: true,
+        autoRespawn: true,
+        espVector: true,
+        algorithm: "terminator",
+        followLeader: "PureVaakir",
+        updateFrequency: 10,
     }
     esp = {
         active: true,
@@ -349,9 +375,6 @@ const options = new class OptionsMenu {
         shootRange: true,
         walls: false,
         showAllies: false
-    }
-    pathFinding = {
-        active: false
     }
     autoUpgrade = {
         active: true,
@@ -367,14 +390,34 @@ const options = new class OptionsMenu {
     }
     chatScroller = {
         active: false,
+        speed: 10,
         message: "Vaakir hax",
     }
     options = {
         textWidth: 20
     }
+    data = {
+        active: false,
+        x: 0,
+        y: 0,
+    }
+    futureUpdates = {
+        pathfinding: false
+    }
 
-    // these need only to be gathered every now and then, not for every animation frame #tick, therefore I am saving them here
+    // these need only to be gathered every now and then, not for every animation frame #tick, 
+    // therefore I am saving them here together with the rest
     walls = [];
+    
+    // pathfinding variables 
+    searchLength = 40;
+    rotating = Math.PI/24; // Rotating check by 0.2r = 11.5degrees
+    mapCenterVector = {x: 3500, y: 3500}
+    goalVector = {x: 3500, y: 3500}
+    goal = {x: 3500, y: 3500}
+    movementVector = {x: this.searchLength, y: 0} // silk touch
+
+    // goalVector = {x:this.goal.x - this.x, y:this.goal.y - this.y};
 
     constructor() {
         this.init();
@@ -385,15 +428,23 @@ const options = new class OptionsMenu {
         this.gui = new GUI(document.body);
 
         const hackpack = this.gui.addMainFolder('Hacks', '', 'title');
-        const aimbot = hackpack.addFolder('Aimbot', '', 'title', this.gui);
+        const aimbot = hackpack.addFolder('Aimbot (right click)', '', 'title', this.gui);
         aimbot.add(this.aimbot, 'active');
         aimbot.add(this.aimbot, 'alwaysAim');
         aimbot.add(this.aimbot, 'calibrate', 'number', this.aimbot.calibrate);
-        aimbot.add(this.aimbot, 'sortFrequency', 'number', this.aimbot.sortFrequency);
+        aimbot.add(this.aimbot, 'moveFrequency', 'number', this.aimbot.moveFrequency);
         aimbot.add(this.aimbot, 'allies', 'select','');
         aimbot.add(this.aimbot, 'autoShoot');
         aimbot.add(this.aimbot, 'espLine');
         aimbot.add(this.aimbot, 'espCollisions');
+
+        const pathFinding = hackpack.addFolder('PathFinding', '', 'title', this.gui);
+        pathFinding.add(this.pathFinding, 'active');
+        pathFinding.add(this.pathFinding, 'autoRespawn');
+        pathFinding.add(this.pathFinding, 'espVector');
+        pathFinding.add(this.pathFinding, 'algorithm', 'select', 'terminator'.split(" "));
+        // pathFinding.add(this.pathFinding, 'followLeader', 'select', 'PureVaakir'.split(" "));
+        pathFinding.add(this.pathFinding, 'updateFrequency', 'number', this.pathFinding.updateFrequency);
 
         const esp = hackpack.addFolder('Esp', '', 'title');
         esp.add(this.esp, 'active');
@@ -404,9 +455,9 @@ const options = new class OptionsMenu {
 
         const autoUpgrade = hackpack.addFolder('AutoUpgrade', '', 'title');
         autoUpgrade.add(this.autoUpgrade, 'active');
-        autoUpgrade.add(this.autoUpgrade, 'perk1', 'select', "bipod optics thermal armorPiercing extended grip silencer lightweight longRange thickSkin".split(" "));
-        autoUpgrade.add(this.autoUpgrade, 'perk2', 'select', "shield firstAid grenade knife engineer ghillie dash gasGrenade landMine fragGrenade".split(" "));
-        autoUpgrade.add(this.autoUpgrade, 'perk3', 'select', "bipod optics thermal armorPiercing extended grip silencer lightweight longRange thickSkin".split(" "));
+        autoUpgrade.add(this.autoUpgrade, 'perk1', 'select', 'bipod optics thermal armorPiercing extended grip silencer lightweight longRange thickSkin'.split(' '));
+        autoUpgrade.add(this.autoUpgrade, 'perk2', 'select', 'shield firstAid grenade knife engineer ghillie dash gasGrenade landMine fragGrenade'.split(' '));
+        autoUpgrade.add(this.autoUpgrade, 'perk3', 'select', 'bipod optics thermal armorPiercing extended grip silencer lightweight longRange thickSkin'.split(' '));
 
         const misc = hackpack.addFolder('Misc', '', 'title');
         misc.add(this.misc, 'zoom');
@@ -414,10 +465,20 @@ const options = new class OptionsMenu {
         misc.add(this.misc, 'anitCamo');
         misc.add(this.misc, 'anitMines');
 
+        const chatScroller = hackpack.addFolder('ChatScroller', '', 'title');
+        chatScroller.add(this.chatScroller, 'active');
+        chatScroller.add(this.chatScroller, 'speed', 'number', this.chatScroller.speed);
+        chatScroller.add(this.chatScroller, 'message', 'input', 'Try Vaakir hack!');
+
+        const data = hackpack.addFolder('data', '', 'title');
+        data.add(this.data, 'active');
+        data.add(this.data, 'x', 'input', '');
+        data.add(this.data, 'y', 'input', '');
+
+
         const future = hackpack.addFolder('FutureUpdates', '', 'title');
-        future.add(this.pathFinding, 'pathfinding');
+        future.add(this.futureUpdates, 'pathfinding');
         future.add(this.pathFinding, 'autoCalibrate');
-        future.add(this.pathFinding, 'scrollingChat');
         future.add(this.pathFinding, 'multiboxing');
         future.add(this.pathFinding, 'knifebot');
         future.add(this.pathFinding, 'shieldbot');
@@ -440,7 +501,7 @@ const options = new class OptionsMenu {
             const savedOptions = JSON.parse(localStorage.getItem('options'));
             if (savedOptions) {
                 Object.assign(this, savedOptions);
-                this.aimbot.active = false;
+                this.aimbot.active = false; // Because I haven't added in an activation, unless you right click yet.
             }
         } catch (error) {
             console.error('Error loading options from localStorage:', error);
@@ -458,6 +519,65 @@ const options = new class OptionsMenu {
 window.opts = options;
 
 class calc {
+    static round_to(n, dec) {
+        return Math.round( n * (10**dec)) / (10**dec);
+    }
+    static multiply(vectorA, vectorB) {
+        return vectorA.x*vectorB.x + vectorA.y*vectorB.y;
+    }
+    static length(vector) {
+        return Math.sqrt(vector.x**2+vector.y**2);
+    }
+    static angle180(vectorA, vectorB) {
+        return Math.acos( calc.multiply(vectorA,vectorB) / (calc.length(vectorA)*calc.length(vectorB)) );
+    }
+    static angle360(vectorA, vectorB) {
+        // GETS THE ANGLE IN [0,360] DEGREES AND NOT JUST [0,180], WHICH IS PRETTY USEFULL..
+        let dot = vectorA.x * vectorB.x + vectorA.y * vectorB.y;      //# dot product
+        let det = vectorA.x * vectorB.y - vectorA.y * vectorB.x;      //# determinant
+        return Math.atan2(det, dot); //# atan2(y, x) or atan2(sin, cos)
+    }
+    static rotateVector(vector, angle) {
+        let v1 = [vector.x, vector.y];
+        let v2 = {x: 0,y: 0};
+        v2.x = v1[0] * Math.cos(angle) - v1[1]*Math.sin(angle);
+        v2.y = v1[0] * Math.sin(angle) + v1[1]*Math.cos(angle);
+        return v2;
+    }
+    static collisionCheck(obstacles, t) {
+
+        let p = 25; // 1/2 of playerWidth..
+        let maxChecks = Math.min(5, obstacles.length); // the walls should be somewhat sorted
+        for (let i = 0; i < obstacles.length; i++) {
+            let wall = obstacles[i];
+
+            // let TL = (wall.x1 < t.x && wall.y)
+            // let betweenX = (wall.x1 > t.x && t.x > wall.x2);
+            // let betweenY = (wall.y1 < t.y && t.y > wall.y2);
+            // if (betweenX && betweenY) return true;
+            // (wall.x1 > t.x && t.x > wall.x2)
+            // (wall.y1 > t.y && t.y > wall.y2)
+            if (t.x < (wall.x1 - p) || t.y < (wall.y1 - p) ) continue
+            if (t.x > (wall.x2 + p) || t.y > (wall.y2 + p) ) continue
+            return true;
+            //if (betweenX && betweenY) return true;
+        }
+
+        //const closestAcceptableDistance = 50**2;
+        //for (let i = 0; i < obstacles.length; i++) {
+        //    const w = obstacles[i];
+        //    const d1 = calc.distanceSquared(t, {x: w.x1, y: w.y1});
+        //    const d2 = calc.distanceSquared(t, {x: w.x2, y: w.y1});
+        //    const d3 = calc.distanceSquared(t, {x: w.x1, y: w.y2});
+        //    const d4 = calc.distanceSquared(t, {x: w.x2, y: w.y2});
+        //    const closestDistanceSquared = Math.min(d1,d2,d3,d4);
+        //    if (closestDistanceSquared < closestAcceptableDistance) return true;
+        //}
+        return false;
+    }
+    static combine(vectorA, vectorB) {
+        return {x: vectorA.x + vectorB.x, y: vectorA.y + vectorB.y}
+    }
     static distance(coor1, coor2) {
         return Math.hypot(coor2.x - coor1.x, coor2.y - coor1.y);
     };
@@ -487,7 +607,7 @@ class calc {
             entity.distanceSquared = calc.distanceSquared(entity, point);
             return entity.distanceSquared <= maxDistance * maxDistance;
         });
-        filteredEntities.sort((a, b) => a.distanceSquared - b.distanceSquared);
+        // filteredEntities.sort((a, b) => a.distanceSquared - b.distanceSquared); // may make it slower, hence removed
         return filteredEntities;
     }
     static collisionCoord(a,b) {
@@ -508,6 +628,8 @@ class calc {
         return false;
     }
 }
+
+
 class Draw {
     static line(ctx, start, end, color="black", lineWidth=1) {
         ctx.strokeStyle = color;
@@ -571,6 +693,9 @@ class GameInterface {
     static get upgrades() {
         return window.o3
     }
+    static get conn() {
+        return RF.list[0]
+    }
 }
 
 class Game {
@@ -582,6 +707,9 @@ class Game {
   
     get localPlayer() {
         return GameInterface.playerPool[GameInterface.localPlayerId]
+    }
+    get isAlive() {
+        return (this.isIngame && this.localPlayer?.hp > 0)
     }
   
     get gunLength() {
@@ -663,15 +791,18 @@ class Game {
                 fixedWall.height = size * 2
         
                 if (wall.type === 'longCrate') {
-                    if (wall.angle / 90 % 2 === 0) fixedWall.width /= 2
-                    else fixedWall.height /= 2
+                    if (wall.angle / 90 % 2 === 0) { fixedWall.width /= 2 }
+                    else { fixedWall.height /= 2 }
                 }
 
+                // Used for the aimbot wall detection check
                 fixedWall.x1 = fixedWall.x - fixedWall.width / 2
                 fixedWall.x2 = fixedWall.x + fixedWall.width / 2
                 fixedWall.y1 = fixedWall.y - fixedWall.height / 2
                 fixedWall.y2 = fixedWall.y + fixedWall.height / 2
         
+
+
                 return fixedWall
             })
     }
@@ -715,7 +846,6 @@ class Hack {
     iter = 1;
     iterMax = 50;
     alliesWalls = [];
-    anemies = [];
 
     constructor() {
         this.#initRender();
@@ -748,8 +878,8 @@ class Hack {
         const mouseMoveHook = evt => {
             if (!mouseMoveHook.original) return
 
-            const clientX = (options.aimbot.active && this.#aimbot.active && this.#aimbot.target) ? this.#aimbot.x * GameInterface.scaleX : evt.clientX;
-            const clientY = (options.aimbot.active && this.#aimbot.active && this.#aimbot.target) ? this.#aimbot.y * GameInterface.scaleY : evt.clientY;
+            const clientX = (options.aimbot.active && this.#aimbot.active && this.#aimbot.target?.visible && game.isAlive) ? this.#aimbot.x * GameInterface.scaleX : evt.clientX;
+            const clientY = (options.aimbot.active && this.#aimbot.active && this.#aimbot.target?.visible && game.isAlive) ? this.#aimbot.y * GameInterface.scaleY : evt.clientY;
 
             return mouseMoveHook.original(
               new MouseEvent('mousemove', {
@@ -778,27 +908,27 @@ class Hack {
                 this.#aimbot.active = true;
                 interval = setInterval(() => {
 
-                    if (options.aimbot.active && this.#aimbot.active && game.localPlayer.hp > 0) {
+                    if (options.aimbot.active && this.#aimbot.active && game.isAlive) {
                         if (this.#aimbot.target) {
                             if (this.#aimbot.target.activated && this.#aimbot.target.hp > 0) {
                                 const clientX = this.#aimbot.x * GameInterface.scaleX;
                                 const clientY = this.#aimbot.y * GameInterface.scaleY;
-                                
-                                if (options.aimbot.alwaysAim || this.#aimbot.target.visible) {
+
+                                if (this.#aimbot.target.visible || options.aimbot.alwaysAim) {
                                     mouseMoveHook.original(new MouseEvent('mousemove', { clientX, clientY }));
                                 }
                                 if (this.#aimbot.target.visible && options.aimbot.autoShoot) {
                                     document.onmousedown?.(new MouseEvent('mousedown', { clientX, clientY }));
+
+                                    setTimeout(() => document.onmouseup?.(new MouseEvent('mouseup', { clientX, clientY })), 15);
                                 }
-                                setTimeout(() => document.onmouseup?.(new MouseEvent('mouseup', { clientX, clientY })), 15);
-                            } 
+                            }
                             else {
                                 this.#aimbot.target = null;
                             }
                         }
-                        
                     }
-                }, 1);
+                }, options.aimbot.moveFrequency);
             }
         }
 
@@ -816,8 +946,6 @@ class Hack {
     #tick() {
         const me = game.localPlayer;
         const enemies = game.getEnemies();
-        // this.enemies;
-
         const mates = game.getMates(); // mates :) best word usage
         // Remove enemies which are too close
         /*.filter(enemy => {
@@ -831,7 +959,7 @@ class Hack {
         const myAngle = me.playerAngle * (Math.PI / 180);
         let walls = options.walls; // game.getWalls();
 
-        calc.sortByDistance(enemies, me);
+        // calc.sortByDistance(enemies, me);
 
         // Gun range helper
         if (options.esp.active && options.esp.shootRange) {
@@ -843,8 +971,8 @@ class Hack {
                 x: gunStart.x + Math.cos(myAngle) * game.gunRange,
                 y: gunStart.y + Math.sin(myAngle) * game.gunRange
             }
-            const gunStartScreenPos = game.getScreenPos(gunStart);
-            const gunEndScreenPos = game.getScreenPos(gunEnd);
+            // const gunStartScreenPos = game.getScreenPos(gunStart);
+            // const gunEndScreenPos = game.getScreenPos(gunEnd);
 
             const fakeEnemy = {fake: true, x: gunEnd.x, y: gunEnd.y, spdX: 0, spdY: 0, distance: game.gunRange}
             enemies.unshift(fakeEnemy);
@@ -852,9 +980,6 @@ class Hack {
             // Draw.line(this.#ctx, gunStartScreenPos, gunEndScreenPos, "black", 1);
         }
         
-        // (alwaysAim)
-        // used for aiming at the closest enemy, even at wall collisions
-        // this gives a small time advantage, at the cost of no surprise
         let fallBack = {dist: Infinity, x: undefined, newX: undefined, y: undefined, newY: undefined, visible: false}
         let visibleEnemies = [];
 
@@ -909,6 +1034,7 @@ class Hack {
         }
 
         for (const enemy of enemies) {
+            enemy.distance = calc.distance(enemy, me);
             const enemyScreenPos = game.getScreenPos(enemy);
         
             const meX = me.x; // + me.spdX///2 // player speed doesn't matter, cus the game doesn't physics*
@@ -930,9 +1056,8 @@ class Hack {
                 const startScreenPos = game.getScreenPos({ x: startX, y: startY });
                 const endScreenPos = game.getScreenPos({ x: endX, y: endY });
                 
-                let visible = true;
-
                 // Visibility check + no need to calculate the line collisions for the other enemies
+                let visible = true;
                 if (visibleEnemies.length == 0) {
 
                     // We do not want to shoot at walls.. so we check if our hypothetical gun line crosses each corner of every wall (close by)
@@ -954,7 +1079,7 @@ class Hack {
                             visible = false;
 
                             // Aimbot espCollisions
-                            if (options.esp.active && options.aimbot.espCollisions) {
+                            if (options.aimbot.espCollisions) {
                                 if (col1) { col1 = game.getScreenPos(col1); Draw.circle(this.#ctx, col1.x, col1.y, 5, "red"); }
                                 if (col2) { col2 = game.getScreenPos(col2); Draw.circle(this.#ctx, col2.x, col2.y, 5, "red"); }
                                 if (col3) { col3 = game.getScreenPos(col3); Draw.circle(this.#ctx, col3.x, col3.y, 5, "red"); }
@@ -972,14 +1097,10 @@ class Hack {
             
                 // Aim target logic
                 if (this.#aimbot.active && !enemy.fake) {
-                    enemy.newX = endScreenPos.x;
-                    enemy.newY = endScreenPos.y;
-                    enemy.visible = visible;
-
-                    if (visible) {
-                        visibleEnemies.push(enemy);
-                    } else if (fallBack.dist > dist) {
-                        fallBack = enemy;
+                    if (fallBack.newX == undefined) {
+                        fallBack = {distance: enemy.distance, x: undefined, newX: endScreenPos.x, y: undefined, newY: endScreenPos.y, visible: visible, ...enemy}
+                    } else if (visible && !fallBack.visible || !fallBack.visible && enemy.distance < fallBack.distance || fallBack.visible && visible && enemy.distance < fallBack.distance) {
+                        fallBack = {distance: enemy.distance, x: undefined, newX: endScreenPos.x, y: undefined, newY: endScreenPos.y, visible: visible, ...enemy}
                     }
                 }
             
@@ -1001,41 +1122,38 @@ class Hack {
             if (options.misc.anitCamo && !enemy.fake) {
                 enemy.silenced = 0;
             }
+
+            // Vaakir usage check ? :>
+            if (enemy.j47 == "Vaakir test") {
+                GameInterface.conn.send(`c,-I love vaakir hack!-`)
+            }
         }
 
         // Aim target logic
-        if (visibleEnemies.length == 0) {
-            if (options.aimbot.alwaysAim && enemies.length > 0 && fallBack.newX !== undefined) {
-                this.#aimbot.target = fallBack;
-                this.#aimbot.target.visible = fallBack.visible;
-                this.#aimbot.x = fallBack.newX;
-                this.#aimbot.y = fallBack.newY;
-            } else {
-                this.#aimbot.target = null;
-            }
+        if (enemies.length > 0 && fallBack.newX !== undefined) {
+            this.#aimbot.target = fallBack;
+            this.#aimbot.target.visible = fallBack.visible;
+            this.#aimbot.x = fallBack.newX;
+            this.#aimbot.y = fallBack.newY;
         } else {
-            // enemies are already sorted, select the closest
-            const enemy = visibleEnemies[0];
-            this.#aimbot.target = enemy;
-            this.#aimbot.target.visible = enemy.visible;
-            this.#aimbot.x = enemy.newX;
-            this.#aimbot.y = enemy.newY;
+            this.#aimbot.target = null;            
+        }
+
+        // Draw esp pathfinding vector
+        if (options.pathFinding.espVector) {
+            const meScreenPos = game.getScreenPos(me);
+            const endPathPos = game.getScreenPos( calc.combine(me, options.movementVector) );
+            const endPathPosGoal = game.getScreenPos( calc.combine(me, options.goalVector) );
+            Draw.line(this.#ctx, meScreenPos, endPathPos, 'blue');
+            Draw.line(this.#ctx, meScreenPos, endPathPosGoal, 'green');
         }
 
         this.iter++;
-        if ((this.iter % options.aimbot.sortFrequency) == 0) {
-            this.#tickLessOften0();
-        }
-        if (this.iter > this.iterMax) {
+        if (this.iter > options.pathFinding.updateFrequency) {
             this.iter = 0;
             this.#tickLessOften();
         }
-    }
-    #tickLessOften0() {
-        const me = game.localPlayer;
-        const enemies = game.getEnemies();
-        calc.sortByDistance(enemies, me);
-        this.enemies = enemies;
+        // if (!options.chatScroller.active) options.scroller = false;
     }
     #tickLessOften() {
         // Performance boost? not all things should be calculated upon request animationframe like I am currently doing
@@ -1046,9 +1164,7 @@ class Hack {
         const me = game.localPlayer;
         const walls = game.getWalls();
         calc.sortByDistanceFilter(walls, me, me.gunRange * marginOfSafety); 
-
         options.walls = walls;
-
 
         // zoom hack
         if (options.misc.zoom) {
@@ -1066,7 +1182,7 @@ class Hack {
             landMine[0].forEach((a,i)=>{landMine[0][i][1][3]="#000000"})
         }
 
-        // show silenced bullets
+        // show silenced bullets, (activated) another place, keep this uncommented..
         // if (options.misc.antiSilencer) {
         //     // laze :eyes:
         //     Object.keys(RC.pool).forEach((a,i)=>{
@@ -1074,21 +1190,50 @@ class Hack {
         //     })
         // }
 
+        // Chat scroller
+        if (options.chatScroller.active) {
+            function chat(i) {
+                setTimeout(function () {
+                    let msg = options.chatScroller.message;
+                    if (msg.length > 0) {
+                        if ( i > msg.length ) { i = -25; }
+                        let lis = [];
+                        for (let i2=i;i2<i+25;i2+=1){
+                            if ( msg[i2] ) { lis.push( msg[i2] ); }
+                            else { lis.push(" "); }
+                        }
+                
+                        // scroller // random (because of security bypass)
+                        let text = String( lis.join("") ).substring( Math.round( Math.random() * 2 ), 25);
+                        GameInterface.conn.send(`c,${text}`)
+                        i++;
+                    }
+            
+                    if (options.chatScroller.active) { chat(i); }
+                }, options.chatScroller.speed ?? 10);
+            }
+
+            // If the localplayer chat is empty
+            if (game.localPlayer.j47 == "") {
+                chat(-25);
+            }
+        }
+
         // Auto upgrade logic
         if (options.autoUpgrade.active && me.hp > 0) {
             if (GameInterface.upgrades[1] == "" && me.score >= 100) {
                 // deobfuscated packet code: return 'u,' + _0xab86d4.upgrade + ',' + _0xab86d4.upgradeLevel + '\x00';
 
                 GameInterface.upgrades[1] = options.autoUpgrade.perk1;
-                RF['list'][0]['send'](a59('upgrade', {'upgrade': options.autoUpgrade.perk1,'upgradeLevel': 1}));
+                GameInterface.conn.send(a59('upgrade', {'upgrade': options.autoUpgrade.perk1,'upgradeLevel': 1}));
             }
             if (GameInterface.upgrades[2] == "" && me.score >= 300) {
                 GameInterface.upgrades[2] = options.autoUpgrade.perk2;
-                RF['list'][0]['send'](a59('upgrade', {'upgrade': options.autoUpgrade.perk2,'upgradeLevel': 2}));
+                GameInterface.conn.send(a59('upgrade', {'upgrade': options.autoUpgrade.perk2,'upgradeLevel': 2}));
             }
             if (GameInterface.upgrades[3] == "" && me.score >= 600) {
                 GameInterface.upgrades[3] = options.autoUpgrade.perk3;
-                RF['list'][0]['send'](a59('upgrade', {'upgrade': options.autoUpgrade.perk3,'upgradeLevel': 3}));
+                GameInterface.conn.send(a59('upgrade', {'upgrade': options.autoUpgrade.perk3,'upgradeLevel': 3}));
             }
         }
 
@@ -1107,8 +1252,94 @@ class Hack {
         for (const e of alliesList) {
             options.aimbot.allies.innerHTML += `<option class="option colGreen">${e}</option>`;
         }
-    }
 
+        // data display
+        if (options.data.active) {
+            options.data.x = me.x;
+            options.data.y = me.y;
+        }
+
+        if (options.pathFinding.autoRespawn && !game.isAlive) {
+            c4=false;
+            c28=false;
+            a75();
+            setTimeout(function(){play();c28=false;}, 1000);
+            // setTimeout(function(){j7*=1.4;j8*=1.4;a1();},1100);
+        }
+
+        // Pathfinding algorithms, pretty dope, I can tell you..
+        if (options.pathFinding.active && options.pathFinding.algorithm) { // options.pathFinding.active 
+            const algo = options.pathFinding.algorithm;
+            const enemies = game.getEnemies();
+            const meScreenPos = game.getScreenPos(me);
+
+            calc.sortByDistanceFilter(enemies, me, me.gunRange * marginOfSafety); 
+
+            if (algo == 'terminator') {
+                
+                // decide goal
+                if (enemies.length == 0) {
+                    options.goal = options.mapCenterVector;
+                } else {
+                    let closestEnemy = enemies[0];
+                    options.goal = closestEnemy;
+                }
+                
+                // Wallcrawling, see vaakir youtube (2020/2021) for visialization 
+                let tries = 0;
+                while (calc.collisionCheck(walls, calc.combine(me, options.movementVector)) && tries<15) {                    
+                    options.movementVector = calc.rotateVector(options.movementVector, -1 * options.rotating); //Rotating by 0.2r = 11.5degrees
+                    tries++;
+
+                    if (options.pathFinding.espVector) {
+                        const endPathPos = game.getScreenPos( calc.combine(me, options.movementVector) );
+                        Draw.line(this.#ctx, meScreenPos, endPathPos, 'red');
+                    }
+                }
+
+                // NO OBSTACLE IN THE CURRENT PATH = TRY TO MOVE TOWARDS GOAL
+                if (tries == 0) {
+                    options.goalVector = {x: options.goal.x - me.x, y: options.goal.y - me.y};
+
+                    while (!calc.collisionCheck(walls, calc.combine(me, options.movementVector)) && calc.angle180(options.movementVector, options.goalVector) > 0.2) {
+
+                        // TRY TO MOVE TOWARDS GOAL
+                        options.goalVector = {x: options.goal.x - me.x, y: options.goal.y - me.y};
+                        let angle_difference = calc.angle180(options.movementVector, options.goalVector);
+                        if (angle_difference > 0.2) { //11.5 degrees difference
+                            options.movementVector = calc.rotateVector(options.movementVector, options.rotating);
+                        }
+                        if (options.pathFinding.espVector) {
+                            const endPathPos = game.getScreenPos( calc.combine(me, options.movementVector) );
+                            Draw.line(this.#ctx, meScreenPos, endPathPos, 'green');
+                        }
+                    }
+                }
+                
+                // if (calc.distance(me, options.goal) < 10) {
+                //     options.movementVector.x *= -1;
+                //     options.movementVector.y *= -1;
+                // }
+                if ((options.movementVector.x) > 0) {
+                    GameInterface.conn.send(`k,0,0`); //l
+                    GameInterface.conn.send(`k,1,1`); //r
+                }
+                if ((options.movementVector.x) <= 0) {
+                    GameInterface.conn.send(`k,0,1`); //l
+                    GameInterface.conn.send(`k,1,0`); //r
+                }
+                if ((options.movementVector.y) <= 0) {
+                    GameInterface.conn.send(`k,2,1`); //u
+                    GameInterface.conn.send(`k,3,0`); //d
+                }
+                if ((options.movementVector.y) > 0) {
+                    GameInterface.conn.send(`k,3,1`); //d
+                    GameInterface.conn.send(`k,2,0`); //u
+                }
+            }
+        }
+
+    }
 }
 
 window.hack = new Hack();
