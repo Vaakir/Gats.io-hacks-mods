@@ -3,6 +3,10 @@
 
 Current Featurelist (See vaakir youtube for more information):
 
+Gui:
+- Draggable by title
+- Multilayered accordion
+
 Aimbot:
 - Active
 - AlwaysAim
@@ -13,6 +17,13 @@ Aimbot:
 - ESPCollisions
 - Allies
 - AlliesList
+
+Pathfinding:
+- Active
+- Terminatorbot
+- Autorespawn
+- Espvector
+- UpdateFrequency (for a lot of things in the game currently)
 
 ESP:
 - Active
@@ -33,10 +44,15 @@ Misc:
 - AntiCamo
 - AntiMines
 
+ChatScroller:
+- Active
+- Message
+- Speed
+
 FutureUpdates:
-- pathfinding
+- pathfinding [petbot/followbot, A**? , more?]
 - autoCalibrate
-- scrollingChat
+- sniperFriendlyAimbot
 - multiboxing
 - knifebot
 - shieldbot
