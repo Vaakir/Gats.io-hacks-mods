@@ -70,8 +70,10 @@ Not included (again check vaakir youtube):
 
 Will never be included:
 - grecaptcha bypass for bots
-- (hash) rainbowtable bypass for bots
+- (hash rainbowtable) bypass for bots
 - 2 ip limitation bypass for bots
+- de-obfuscation script
+- 6 simulation scripts (client side of the game built from scratch to simulate and optimize bot movement and shooting strategies)
 
 Patched and will never be included (thank god):
 - XSS
