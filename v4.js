@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Gats.io - Vaakir's hack pack GUI V4
 // @namespace    http://tampermonkey.net/
-// @version      4.8
+// @version      4.5
 // @description  The almighty one
 // @author       PureVaakir (88%) & Freehuntx (12%)
 // @match        https://gats.io/
@@ -534,7 +534,7 @@ class calc {
     }
 
     static aheadNess(e, distance) {
-        let vect = {
+        return {
             x: e.x + e.spdX * distance / (window.fac ?? options.aimbot.calibrate - GameInterface.currentPing/10),
             y: e.y + e.spdY * distance / (window.fac ?? options.aimbot.calibrate - GameInterface.currentPing/10),
         }
