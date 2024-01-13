@@ -18,11 +18,16 @@ Aimbot:
 - Allies
 - AlliesList
 
-Pathfinding:
-- Active
-- Terminatorbot
-- Autorespawn
-- Espvector
+AI:
+- AutoRespawn
+- AutoTalk (Based on AI state [attack, dodge, retreat, keep distance, protect master player, hp, ..])
+- AUtoTacticalReload
+- PathFinding (Wallcrawler - for the right hand logic, body protected, gun on the side)
+- AutoRetreat (vecFromEnemiesToMe inversely weighted and combined to decide new goal)
+- GoalDeciding [Terminatorbot -> enemies, follow -> protect master player]
+- FollowLeader [the master to protect]
+- Espvector (To visualize what is going on
+- BulletDodging (Bullets are set as temporary obstacles in front of the player, vector avoidance can be added for sniper shots later for improved performance)
 - UpdateFrequency (for a lot of things in the game currently)
 
 ESP:
@@ -59,9 +64,11 @@ Customizable texturePack
 - squareCrate
 - longCrateBorder
 - squareCrateBorder
+- darkmode added
+- reset / random abilities (color theory can be added here for improved random textures)
 
 Not included (again check vaakir youtube):
-- pathfinding [wallcrawler, A** , navmesh (3 different type of vector based pathfinding algos)]
+- mroe pathfinding algorithms [A** , navmesh (3 different type of vector based pathfinding algos)]
 - autoCalibrate (autoadjust aiming variable to how far ahead of the enemy to shoot based your game ping)
 - sniperFriendlyAimbot
 - multiboxing
